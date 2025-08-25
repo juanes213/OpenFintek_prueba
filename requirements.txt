@@ -1,0 +1,40 @@
+# Core Framework
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+aiofiles
+
+# Data Validation
+pydantic
+
+# HTTP Requests
+requests
+httpx
+
+# Environment Variables
+python-dotenv
+
+# Data Processing (for Excel)
+pandas
+openpyxl
+
+# Database - Supabase Only
+supabase
+
+# AI - Google Gemini
+google-generativeai
+
+# Agentic System Dependencies
+# For enhanced async processing and task coordination
+aiofiles
+# For data structures and utilities
+dataclasses-json
+# For typing support
+typing-extensions
+# For JSON schema validation
+jsonschema
+# For advanced logging
+structlog
+# For performance monitoring
+psutil

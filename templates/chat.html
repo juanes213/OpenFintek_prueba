@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waver - Asistente Virtual</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=4.0">
+    <link rel="stylesheet" href="/static/css/overrides.css?v=2.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Meta información para SEO y redes sociales -->
+    <meta name="description" content="Waver - Asistente virtual para consultas de e-commerce, pedidos, productos y soporte al cliente">
+    <meta name="author" content="E-commerce Chatbot">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- Open Graph para compartir -->
+    <meta property="og:title" content="Waver - Asistente Virtual E-commerce">
+    <meta property="og:description" content="Chat inteligente para consultas de pedidos, productos y soporte">
+    <meta property="og:type" content="website">
+    
+    <!-- Configuración de PWA -->
+    <meta name="theme-color" content="#7c3aed">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Waver Chatbot">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" role="navigation" aria-label="Navegación principal">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg id="waverLogo" class="waver-logo" width="40" height="40" viewBox="0 0 100 100" aria-label="Waver Avatar">
+                        <!-- Avatar animado se insertará aquí -->
+                    </svg>
+                    <span class="logo-text">Waver</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav" role="menu">
+                <button class="nav-item active" data-section="chat" role="menuitem" aria-current="page" aria-label="Conversación actual">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M8 12H8.01M12 12H12.01M16 12H16.01M21 12C21 16.418 16.97 20 12 20C10.5 20 9.07 19.62 7.79 18.96L3 20L4.24 15.62C3.5 14.34 3 12.72 3 12C3 7.582 7.03 4 12 4C16.97 4 21 7.582 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Conversación</span>
+                </button>
+                <button class="nav-item" data-section="history" role="menuitem" aria-label="Ver historial de conversaciones">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12 8V12L15 15M21 12C21 16.97 16.97 21 12 21C7.03 21 3 16.97 3 12C3 7.03 7.03 3 12 3C16.97 3 21 7.03 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Historial</span>
+                </button>
+                <button class="nav-item" data-section="settings" role="menuitem" aria-label="Configuración de la aplicación">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12 15C13.657 15 15 13.657 15 12C15 10.343 13.657 9 12 9C10.343 9 9 10.343 9 12C9 13.657 10.343 15 12 15Z" stroke="currentColor" stroke-width="2"/>
+                        <path d="M19.4 15C19.19 15.45 19.16 15.99 19.35 16.47L19.44 16.66C19.74 17.36 19.59 18.18 19.06 18.71L18.71 19.06C18.18 19.59 17.36 19.74 16.66 19.44L16.47 19.35C15.99 19.16 15.45 19.19 15 19.4C14.55 19.61 14.22 20 14.11 20.48L14.05 20.69C13.87 21.44 13.21 22 12.44 22H11.56C10.79 22 10.13 21.44 9.95 20.69L9.89 20.48C9.78 20 9.45 19.61 9 19.4C8.55 19.19 8.01 19.16 7.53 19.35L7.34 19.44C6.64 19.74 5.82 19.59 5.29 19.06L4.94 18.71C4.41 18.18 4.26 17.36 4.56 16.66L4.65 16.47C4.84 15.99 4.81 15.45 4.6 15C4.39 14.55 4 14.22 3.52 14.11L3.31 14.05C2.56 13.87 2 13.21 2 12.44V11.56C2 10.79 2.56 10.13 3.31 9.95L3.52 9.89C4 9.78 4.39 9.45 4.6 9C4.81 8.55 4.84 8.01 4.65 7.53L4.56 7.34C4.26 6.64 4.41 5.82 4.94 5.29L5.29 4.94C5.82 4.41 6.64 4.26 7.34 4.56L7.53 4.65C8.01 4.84 8.55 4.81 9 4.6C9.45 4.39 9.78 4 9.89 3.52L9.95 3.31C10.13 2.56 10.79 2 11.56 2H12.44C13.21 2 13.87 2.56 14.05 3.31L14.11 3.52C14.22 4 14.55 4.39 15 4.6C15.45 4.81 15.99 4.84 16.47 4.65L16.66 4.56C17.36 4.26 18.18 4.41 18.71 4.94L19.06 5.29C19.59 5.82 19.74 6.64 19.44 7.34L19.35 7.53C19.16 8.01 19.19 8.55 19.4 9C19.61 9.45 20 9.78 20.48 9.89L20.69 9.95C21.44 10.13 22 10.79 22 11.56V12.44C22 13.21 21.44 13.87 20.69 14.05L20.48 14.11C20 14.22 19.61 14.55 19.4 15Z" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <span>Configuración</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button class="nav-item" id="clearChatBtn" aria-label="Iniciar nueva conversación">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M19 7L18.133 19.142C18.08 19.938 17.454 20.574 16.657 20.627L16.5 20.634H7.5C6.669 20.634 5.959 20.004 5.875 19.176L5 7M10 11V17M14 11V17M15 7V4C15 3.448 14.552 3 14 3H10C9.448 3 9 3.448 9 4V7M4 7H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Nueva conversación</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Mobile Overlay -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
+        <!-- Connection Status Indicator -->
+        <div class="connection-status" id="connectionStatus">
+            <span id="connectionText">Conectado</span>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="main-content" role="main" aria-label="Área de conversación">
+            
+            <!-- Sidebar Toggle Button -->
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Abrir menú lateral">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-label="Historial de conversación">
+                    <!-- Welcome Message -->
+                    <div class="message-group bot-group" role="article" aria-label="Mensaje de bienvenida de Waver">
+                        <div class="message-avatar">
+                            <svg class="avatar-svg" width="32" height="32" viewBox="0 0 100 100" aria-label="Avatar de Waver">
+                                <!-- Avatar SVG aquí -->
+                            </svg>
+                        </div>
+                        <div class="message-content-wrapper">
+                            <div class="message-author">Waver</div>
+                            <div class="message bot-message">
+                                <div class="message-text">
+                                    Hola, soy Waver, tu agente de e-commerce. Estoy aquí para ayudarte con:
+                                    <ul class="feature-list">
+                                        <li>Consultas sobre el estado de tus pedidos</li>
+                                        <li>Información detallada de productos</li>
+                                        <li>Políticas de devolución y garantía</li>
+                                        <li>Soporte técnico especializado</li>
+                                    </ul>
+                                    ¿En qué puedo asistirte hoy?
+                                </div>
+                                <div class="message-time" id="initialTime"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div class="typing-indicator" id="typingIndicator" style="display: none;" aria-live="polite" aria-label="Waver está escribiendo">
+                    <div class="typing-avatar">
+                        <svg class="avatar-svg thinking" width="32" height="32" viewBox="0 0 100 100" aria-hidden="true">
+                            <!-- Avatar pensando -->
+                        </svg>
+                    </div>
+                    <div class="typing-content">
+                        <span>Waver está escribiendo</span>
+                        <div class="typing-dots" aria-hidden="true">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scroll to Bottom Button -->
+                <button class="scroll-to-bottom" id="scrollToBottomBtn" aria-label="Desplazarse al final de la conversación" title="Ir al final">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M7 13L12 18L17 13M7 6L12 11L17 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <!-- Input Area -->
+                <div class="chat-input-wrapper" role="region" aria-label="Enviar mensaje">
+                    <form id="chatForm" class="chat-form">
+                        <div class="input-container">
+                            <label for="messageInput" class="sr-only">Mensaje para Waver</label>
+                            <input 
+                                type="text" 
+                                id="messageInput" 
+                                class="message-input" 
+                                placeholder="Escribe tu mensaje..."
+                                maxlength="500"
+                                autocomplete="off"
+                                aria-describedby="charCounter"
+                                aria-label="Escribe tu mensaje para Waver"
+                            >
+                            <div class="input-actions">
+                                <span class="char-counter" id="charCounter" aria-live="polite">0/500</span>
+                                <button type="submit" class="send-button" id="sendButton" aria-label="Enviar mensaje">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="send-icon" aria-hidden="true">
+                                        <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="loading-icon" style="display: none;" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-dasharray="60" stroke-dashoffset="60">
+                                            <animate attributeName="stroke-dashoffset" dur="1s" repeatCount="indefinite" from="60" to="0"/>
+                                        </circle>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="historyModalTitle">Historial de Conversaciones</h2>
+                <button class="modal-close" id="closeModal" aria-label="Cerrar historial">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="historyContent" role="region" aria-label="Contenido del historial">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/waver-avatar.js"></script>
+    <script src="/static/js/chat.js"></script>
+    
+    <!-- Token Metrics Status Bar del index.html -->
+    <div class="token-metrics hidden" id="tokenMetrics">
+        <div class="token-metrics-content">
+            <div class="metric-model">
+                <span>Waver</span>
+            </div>
+            <span class="metric-separator">|</span>
+            <div class="metric-item">
+                <span class="metric-value" id="tokensPerSec">0</span>
+                <span class="metric-label">tok/sec</span>
+            </div>
+            <span class="metric-separator">|</span>
+            <div class="metric-item">
+                <span class="metric-value" id="totalTokens">0</span>
+                <span class="metric-label">tokens</span>
+            </div>
+            <span class="metric-separator">|</span>
+            <div class="metric-item">
+                <span class="metric-label">Time:</span>
+                <span class="metric-value" id="executionTime">0.0s</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Script inline para configuración inicial -->
+    <script>
+        // Configuración inicial
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mostrar información del navegador en consola
+            console.log('Chatbot E-commerce iniciado');
+            console.log('Navegador:', navigator.userAgent);
+            console.log('Pantalla:', window.screen.width + 'x' + window.screen.height);
+            
+            // Verificar soporte de funcionalidades
+            if ('localStorage' in window) {
+                console.log('✅ LocalStorage soportado');
+            } else {
+                console.warn('⚠️ LocalStorage no soportado');
+            }
+            
+            if ('fetch' in window) {
+                console.log('✅ Fetch API soportado');
+            } else {
+                console.warn('⚠️ Fetch API no soportado');
+            }
+            
+            // Auto-test de conectividad después de 2 segundos
+            setTimeout(() => {
+                if (typeof ChatbotUtils !== 'undefined') {
+                    ChatbotUtils.testAPI().then(result => {
+                        if (result) {
+                            console.log('✅ Conectividad con API verificada');
+                        } else {
+                            console.warn('⚠️ Problema de conectividad con API');
+                        }
+                    });
+                }
+            }, 2000);
+        });
+        
+        // Manejo de errores globales
+        window.addEventListener('error', function(e) {
+            console.error('❌ Error en la aplicación:', e.error);
+        });
+        
+        // Manejo de errores de promesas no capturadas
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('❌ Promesa rechazada no manejada:', e.reason);
+        });
+    </script>
+</body>
+</html>
