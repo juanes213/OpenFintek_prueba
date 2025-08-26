@@ -14,11 +14,11 @@ class WaverAvatar {
             active: `
                 <defs>
                     <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1">
-                            <animate attributeName="stop-color" values="#7c3aed;#a78bfa;#7c3aed" dur="3s" repeatCount="indefinite" />
+                        <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1">
+                            <animate attributeName="stop-color" values="#60a5fa;#3b82f6;#1d4ed8" dur="3s" repeatCount="indefinite" />
                         </stop>
-                        <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1">
-                            <animate attributeName="stop-color" values="#a78bfa;#7c3aed;#a78bfa" dur="3s" repeatCount="indefinite" />
+                        <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1">
+                            <animate attributeName="stop-color" values="#1d4ed8;#60a5fa;#3b82f6" dur="3s" repeatCount="indefinite" />
                         </stop>
                     </linearGradient>
                     <filter id="glow">
@@ -81,7 +81,7 @@ class WaverAvatar {
                 <defs>
                     <linearGradient id="thinkingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1">
-                            <animate attributeName="stop-color" values="#f59e0b;#fbbf24;#f59e0b" dur="1s" repeatCount="indefinite" />
+                            <animate attributeName="stop-color" values="#0b0ff5ff;#fbbf24;#f59e0b" dur="1s" repeatCount="indefinite" />
                         </stop>
                         <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:1">
                             <animate attributeName="stop-color" values="#fbbf24;#f59e0b;#fbbf24" dur="1s" repeatCount="indefinite" />
@@ -190,7 +190,7 @@ class WaverAvatar {
             } else {
                 // User avatar (simple circle with initial)
                 svg.innerHTML = `
-                    <circle cx="50" cy="50" r="45" fill="#7c3aed" />
+                    <circle cx="50" cy="50" r="45" fill="#463aedff" />
                     <text x="50" y="50" text-anchor="middle" dy=".3em" fill="white" font-size="40" font-weight="600">U</text>
                 `;
             }

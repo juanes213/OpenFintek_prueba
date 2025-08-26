@@ -111,8 +111,13 @@ class WaverChat {
         // Initialize character counter
         this.updateCharCounter();
         
-        // Load sidebar state
-        this.loadSidebarState();
+        // Load sidebar state (si es minimal, forzar abierto)
+        const app = document.querySelector('.app-container');
+        if (app?.classList.contains('minimal')) {
+            this.openSidebar();
+        } else {
+            this.loadSidebarState();
+        }
         
     }
     
@@ -251,6 +256,14 @@ class WaverChat {
             avatarSvg.setAttribute('width', '32');
             avatarSvg.setAttribute('height', '32');
             avatarSvg.setAttribute('viewBox', '0 0 100 100');
+            // Insertar el SVG animado azul del avatar
+            try {
+                if (window.waverAvatar && typeof window.waverAvatar.getAvatarSVG === 'function') {
+                    avatarSvg.innerHTML = window.waverAvatar.getAvatarSVG('active');
+                }
+            } catch (e) {
+                // Silencioso: si falla, se llenará por inicializador global
+            }
             avatarDiv.appendChild(avatarSvg);
             messageGroupDiv.appendChild(avatarDiv);
         }
@@ -259,11 +272,13 @@ class WaverChat {
         const contentWrapperDiv = document.createElement('div');
         contentWrapperDiv.className = 'message-content-wrapper';
         
-        // Author
+    // Encabezado con autor (y avatar inline para bot)
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'message-header';
         const authorDiv = document.createElement('div');
         authorDiv.className = 'message-author';
-        authorDiv.textContent = sender === 'user' ? 'Tú' : 'Waver';
-        contentWrapperDiv.appendChild(authorDiv);
+        authorDiv.appendChild(document.createTextNode(sender === 'user' ? 'Tú' : 'Waver'));
+        headerDiv.appendChild(authorDiv);
         
         // Mensaje
         const messageDiv = document.createElement('div');
@@ -274,35 +289,61 @@ class WaverChat {
         messageTextDiv.innerHTML = this.escapeHtml(content);
         messageDiv.appendChild(messageTextDiv);
         
-        // Time with status for user messages
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'message-time';
-        
-        const timeText = document.createElement('span');
-        timeText.textContent = this.formatTime(new Date());
-        timeDiv.appendChild(timeText);
-        
-        if (sender === 'user') {
-            const statusDiv = document.createElement('div');
-            statusDiv.className = 'message-status';
-            statusDiv.innerHTML = `
-                <svg class="status-icon sent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4"/>
+        // Para bot: hora debajo del chat (no debajo del autor)
+        if (sender !== 'user') {
+            // Encabezado
+            contentWrapperDiv.appendChild(headerDiv);
+            // Mensaje primero
+            contentWrapperDiv.appendChild(messageDiv);
+            // Hora debajo del mensaje
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            const timeText = document.createElement('span');
+            timeText.textContent = this.formatTime(new Date());
+            timeDiv.appendChild(timeText);
+            contentWrapperDiv.appendChild(timeDiv);
+        } else {
+            // Para user: burbuja + hora debajo (centrada) y avatar a la derecha
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            const timeText = document.createElement('span');
+            timeText.textContent = this.formatTime(new Date());
+            timeDiv.appendChild(timeText);
+
+            // Columna derecha (contenido): 'Tú' arriba, burbuja, hora
+            const contentCol = document.createElement('div');
+            contentCol.className = 'user-bubble-col';
+            contentCol.appendChild(headerDiv); // 'Tú' arriba
+            contentCol.appendChild(messageDiv); // burbuja
+            contentCol.appendChild(timeDiv); // hora debajo
+
+            // Avatar a la derecha de la burbuja
+            const avatar = document.createElement('div');
+            avatar.className = 'user-bubble-avatar';
+            avatar.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                 </svg>
             `;
-            timeDiv.appendChild(statusDiv);
+
+            const row = document.createElement('div');
+            row.className = 'user-bubble-row';
+            // Estructura: contenido a la derecha, avatar aún más a la derecha
+            row.appendChild(contentCol);
+            row.appendChild(avatar);
+
+            contentWrapperDiv.appendChild(row);
         }
-        
-        messageDiv.appendChild(timeDiv);
-        
-        contentWrapperDiv.appendChild(messageDiv);
         messageGroupDiv.appendChild(contentWrapperDiv);
         
-        return messageGroupDiv;
+    return messageGroupDiv;
     }
     
     updateMessageStatus(messageElement, status) {
-        const statusIcon = messageElement.querySelector('.status-icon');
+        // Buscar el icono de estado dentro del grupo del mensaje
+        const group = messageElement.closest ? (messageElement.closest('.message-group') || messageElement) : messageElement;
+        const statusIcon = group.querySelector('.status-icon');
         if (!statusIcon) return;
         
         statusIcon.classList.remove('sent', 'delivered', 'read');
@@ -611,11 +652,11 @@ class WaverChat {
     }
     
     markVisibleMessagesAsRead() {
-        const userMessages = this.chatMessages.querySelectorAll('.user-message');
-        userMessages.forEach(message => {
-            const statusIcon = message.querySelector('.status-icon');
+        const userGroups = this.chatMessages.querySelectorAll('.message-group.user-group');
+        userGroups.forEach(group => {
+            const statusIcon = group.querySelector('.status-icon');
             if (statusIcon && !statusIcon.classList.contains('read')) {
-                this.updateMessageStatus(message, 'read');
+                this.updateMessageStatus(group, 'read');
             }
         });
     }
@@ -669,8 +710,14 @@ class WaverChat {
         // Resetear métricas de tokens
         this.resetTokenMetrics();
         
-        // Close sidebar on clear (optional)
-        this.closeSidebar();
+        // En modo minimal, mantener el sidebar visible
+        const app = document.querySelector('.app-container');
+        if (app?.classList.contains('minimal')) {
+            this.openSidebar();
+        } else {
+            // Close sidebar on clear (optional)
+            this.closeSidebar();
+        }
         
         this.messageInput.focus();
     }
