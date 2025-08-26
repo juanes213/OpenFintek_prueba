@@ -1,4 +1,4 @@
-"""Cliente de Supabase (solo datos reales, sin mock)."""
+"""Cliente de Supabase."""
 
 import os
 from supabase import create_client, Client

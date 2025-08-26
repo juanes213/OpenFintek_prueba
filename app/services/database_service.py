@@ -2,9 +2,10 @@ from app.models.supabase_client import get_supabase_client
 from app.models.pydantic_models import ConversationCreate
 from typing import List, Optional, Dict, Any, cast
 from supabase import Client
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import uuid
+import json
 
 class DatabaseService:
     """Servicio simplificado para operaciones con Supabase"""
@@ -337,14 +338,46 @@ class ResponseGenerator:
                 order_id = order.get('order_id', '')
                 status = order.get('status', '')
                 customer = order.get('customer_name', '')
-                return f"[DATOS BD] Pedido {order_id}: Estado {status}. Cliente: {customer}."
+                return f"**Pedido {order_id}**\n\n• Estado: {status}\n• Cliente: {customer}"
             else:
-                return f"[SIN DATOS] No hay información del pedido {numero_pedido} en el sistema."
+                # Verificar si existe algún pedido con formato similar
+                all_orders = self.db_service.get_all_orders()
+                existing_ids = [o.get('order_id', '') for o in all_orders]
+                
+                return f"**Pedido no encontrado**\n\nEl pedido {numero_pedido} no existe en el sistema.\n\n• Total de pedidos registrados: {len(existing_ids)}\n• Últimos IDs: {', '.join(existing_ids[-5:]) if existing_ids else 'ninguno'}"
         else:
-            return "Necesito el número de pedido (ej: ORD123)."
+            return "Proporciona el número de pedido para consultar (ej: ORD-001)."
     
     def generate_product_response(self, entities: dict, user_message: str) -> str:
         """Generar respuesta para consultas de productos"""
+        message_lower = user_message.lower()
+        
+        # Soporte explícito: productos "bajo demanda" (on demand)
+        if any(t in message_lower for t in ["bajo demanda", "on demand", "a demanda", "demanda"]):
+            products = self.db_service.get_all_products_detailed()
+            on_demand = [p for p in products if "bajo demanda" in str(p.get('availability', '')).lower()]
+            total = len(on_demand)
+            if total == 0:
+                return "**Productos Bajo Demanda**\n\nNo hay productos bajo demanda actualmente."
+            
+            # Formato en tabla si el usuario lo pide
+            if self._wants_table(message_lower):
+                cols = [("Producto", "product_name"), ("Categoría", "category"), ("Precio", "price"), ("Disponibilidad", "availability")]
+                rows = on_demand[:10]
+                table = self._format_table(rows, cols)
+                return f"**Productos Bajo Demanda** ({total})\n\n{table}"
+            
+            # Formato en lista (por defecto)
+            sample = on_demand[:8]
+            bullets = []
+            for p in sample:
+                name = p.get('product_name', 'Producto sin nombre')
+                cat = p.get('category', 'Categoría N/D')
+                price = p.get('price', 'N/D')
+                bullets.append(f"• {name} — {cat} — ${price}")
+            more = f"\n\n*Y {total - len(sample)} más...*" if total > len(sample) else ""
+            return f"**Productos Bajo Demanda** ({total})\n\n" + "\n".join(bullets) + more
+        
         keywords = entities.get("producto_keywords", [])
         
         if keywords:
@@ -356,62 +389,86 @@ class ResponseGenerator:
                     avail_str = str(product.get('availability', '')).lower()
                     availability = "disponible" if ("sin" not in avail_str) else "agotado"
                     product_name = product.get('product_name', '')
-                    return f"[DATOS BD] {product_name}: {availability}."
+                    price = product.get('price', 'No especificado')
+                    return f"**{product_name}**\n\n• Estado: {availability}\n• Precio: {price}"
                 else:
-                    product_names = [p.get('product_name', '') for p in products]
-                    return f"[DATOS BD] Encontré {len(products)} productos: {', '.join(product_names[:10])}{'...' if len(product_names)>10 else ''}."
+                    product_list = "\n".join([f"• {p.get('product_name', 'Producto')} ({str(p.get('availability', '')).lower()})" for p in products[:10]])
+                    more_info = f"\n\n*Mostrando {min(len(products), 10)} de {len(products)} resultados*" if len(products) > 10 else ""
+                    return f"**Productos encontrados** ({len(products)})\n\n{product_list}{more_info}"
             else:
-                return f"[SIN DATOS] No hay productos con '{', '.join(keywords)}' en el sistema."
+                return f"**Sin resultados**\n\nNo se encontraron productos con: {', '.join(keywords)}"
         else:
-            return "¿Qué producto buscas?"
+            return "¿Qué producto buscas? Especifica nombre o características."
     
     def generate_policy_response(self, entities: dict, user_message: str) -> str:
-        """Generar respuesta para consultas de políticas"""
+        """Generar respuesta para consultas de políticas - maneja múltiples preguntas"""
         message_lower = user_message.lower()
+        responses = []
+        
+        # Detectar múltiples políticas consultadas
+        policies_found = []
         
         if "devolución" in message_lower or "cambio" in message_lower:
             policy_info = self.db_service.get_company_info_by_topic("devoluciones")
-        elif "envío" in message_lower or "entrega" in message_lower:
-            policy_info = self.db_service.get_company_info_by_topic("envios")
-        elif "horario" in message_lower or "atención" in message_lower:
-            policy_info = self.db_service.get_company_info_by_topic("horarios")
-        else:
-            policy_info = None
+            if policy_info:
+                info = policy_info.get('info', '')
+                policies_found.append(("**Política de Devoluciones**", info))
         
-        if policy_info:
-            # Datos reales de la BD
-            info = policy_info.get('info', '')
-            return f"[DATOS BD] {info[:100]}" if len(info) > 100 else f"[DATOS BD] {info}"
+        if "horario" in message_lower or "atención" in message_lower:
+            policy_info = self.db_service.get_company_info_by_topic("horarios")
+            if policy_info:
+                info = policy_info.get('info', '')
+                policies_found.append(("**Horarios de Atención**", info))
+        
+        if "envío" in message_lower or "entrega" in message_lower:
+            policy_info = self.db_service.get_company_info_by_topic("envios")
+            if policy_info:
+                info = policy_info.get('info', '')
+                policies_found.append(("**Política de Envíos**", info))
+        
+        if policies_found:
+            # Formatear respuestas múltiples
+            formatted_responses = []
+            for title, info in policies_found:
+                # Dividir info en puntos si es largo
+                if len(info) > 100:
+                    formatted_responses.append(f"{title}\n\n• {info[:100]}...")
+                else:
+                    formatted_responses.append(f"{title}\n\n• {info}")
+            
+            return "\n\n".join(formatted_responses)
         else:
+            # Si no se encontró nada específico, mostrar opciones disponibles
             all_policies = self.db_service.get_all_company_info()
             if all_policies:
                 topics = [p.get('topic', '') for p in all_policies]
-                return f"[DATOS BD] Temas disponibles: {', '.join(topics)}."
+                topic_list = "\n".join([f"• {topic.title()}" for topic in topics])
+                return f"**Políticas Disponibles**\n\n{topic_list}"
             else:
-                return "[SIN DATOS] No hay información de políticas en el sistema."
+                return "**Sin políticas**\n\nNo hay información de políticas registrada."
     
     def generate_general_response(self, entities: dict, user_message: str) -> str:
         """Generar respuesta para información general"""
         message_lower = user_message.lower()
         
         if any(greeting in message_lower for greeting in ["hola", "hi", "hello", "buenos días", "buenas tardes"]):
-            return "¡Hola! Puedo ayudarte con pedidos, productos y políticas."
+            return "**Panel Administrativo Waver**\n\nPuedo ayudarte a revisar:\n\n• Pedidos y estados\n• Inventario y productos\n• Políticas de la tienda"
         
         elif any(help_word in message_lower for help_word in ["ayuda", "help", "asistencia"]):
-            return "Puedo ayudarte con: pedidos (dame el número), productos, políticas."
+            return "**Asistencia Disponible**\n\n• Consulta de pedidos (proporciona el número)\n• Revisión de inventario\n• Análisis y estadísticas\n• Políticas de empresa"
         
         elif any(thanks in message_lower for thanks in ["gracias", "thank you"]):
-            return "¡De nada!"
+            return "**De nada**\n\n¿Necesitas consultar algo más?"
         
         elif any(bye in message_lower for bye in ["adiós", "bye", "hasta luego"]):
-            return "¡Hasta luego!"
+            return "**Hasta luego**\n\nQue tengas un buen día."
         
         else:
-            return "¿En qué puedo ayudarte? Pedidos, productos o políticas."
+            return "**¿En qué puedo ayudarte?**\n\nEspecifica qué información necesitas:\n\n• Pedidos\n• Inventario\n• Políticas"
     
     def generate_escalation_response(self, entities: dict, user_message: str) -> str:
         """Generar respuesta para escalación a humanos"""
-        return "Te conecto con un agente humano. Por favor espera."
+        return "Transfiriendo consulta a soporte técnico especializado. Por favor espera."
     
     def generate_analytics_response(self, analytics_type: str, user_message: str) -> str:
         """Generar respuesta para consultas analíticas y complejas"""
@@ -422,15 +479,19 @@ class ResponseGenerator:
             if "todos" in message_lower or "lista" in message_lower or "cuáles" in message_lower:
                 customers = self.db_service.get_all_customers()
                 if customers:
-                    customer_names = [c['customer_name'] for c in customers[:10]]  # Primeros 10
+                    customer_names = [c['customer_name'] for c in customers[:8]]  # Primeros 8
                     total = len(customers)
-                    return f"[DATOS BD] Tenemos {total} clientes. Algunos: {', '.join(customer_names)}..."
+                    customer_list = "\n".join([f"• {name}" for name in customer_names])
+                    more_info = f"\n\n*Y {total-8} clientes más...* " if total > 8 else ""
+                    return f"**Clientes Registrados** ({total})\n\n{customer_list}{more_info}"
                 else:
-                    return "[SIN DATOS] No hay clientes registrados."
+                    return "**Sin clientes**\n\nNo hay clientes registrados en el sistema."
             
             elif "estadísticas" in message_lower or "resumen" in message_lower:
                 stats = self.db_service.get_order_statistics()
-                return f"[DATOS BD] Total clientes: {stats['unique_customers']}. Top clientes: {', '.join([f'{c[0]} ({c[1]} pedidos)' for c in stats['top_customers'][:3]])}"
+                top_customers = [f"• {c[0]}: {c[1]} pedidos" for c in stats.get('top_customers', [])[:3]]
+                top_list = "\n".join(top_customers) if top_customers else "• No hay datos"
+                return f"**Estadísticas de Clientes**\n\n• Total: {stats.get('unique_customers', 0)}\n\n**Top Clientes:**\n{top_list}"
         
         # Análisis de pedidos
         elif any(word in message_lower for word in ["pedidos", "orders", "órdenes"]):
@@ -439,73 +500,142 @@ class ResponseGenerator:
             if normalized:
                 count = self.db_service.get_total_orders_by_status(normalized)
                 if count > 0:
-                    # Opcionalmente listar algunos IDs
-                    some = self.db_service.get_orders_by_status(normalized)[:5]
-                    ids = ', '.join([o.get('order_id','') for o in some])
-                    suffix = f" IDs: {ids}" if ids.strip() else ""
-                    return f"[DATOS BD] Pedidos en '{normalized}': {count}.{suffix}"
+                    some = self.db_service.get_orders_by_status(normalized)[:3]
+                    ids_list = "\n".join([f"• {o.get('order_id','')}" for o in some]) if some else ""
+                    return f"**Pedidos '{normalized}'** ({count})\n\n**Ejemplos:**\n{ids_list}"
                 else:
-                    return f"[DATOS BD] Pedidos en '{normalized}': 0."
+                    return f"**Pedidos '{normalized}'**\n\nNo hay pedidos con este estado."
             
             # Conteo total
             if any(x in message_lower for x in ["cuantos", "cuántos", "total"]):
                 total = self.db_service.get_total_orders()
-                return f"[DATOS BD] Total de pedidos: {total}."
+                return f"**Total de Pedidos**\n\n• {total} pedidos registrados"
             
             # Estadísticas/resumen
             if any(x in message_lower for x in ["estadísticas", "resumen", "análisis"]):
                 stats = self.db_service.get_order_statistics()
-                status_info = ', '.join([f"{k}: {v}" for k, v in stats['by_status'].items()])
-                return f"[DATOS BD] Total pedidos: {stats['total_orders']}. Por estado: {status_info}"
+                status_list = "\n".join([f"• {k}: {v}" for k, v in stats.get('by_status', {}).items()])
+                return f"**Resumen de Pedidos**\n\n• Total: {stats.get('total_orders', 0)}\n\n**Por Estado:**\n{status_list}"
         
         # Análisis de productos
         elif any(word in message_lower for word in ["productos", "products", "inventario"]):
+            
+            # PRIMERO: Consultas específicas de stock/disponibilidad
+            if any(phrase in message_lower for phrase in ["en stock", "stock", "disponibles", "tenemos"]):
+                products = self.db_service.get_all_products_detailed()
+                in_stock = [p for p in products if p.get('availability') == 'En stock']
+                
+                if not in_stock:
+                    return "**Productos en Stock**\n\nNo hay productos disponibles en stock actualmente."
+                
+                # Mostrar productos reales en stock
+                total = len(in_stock)
+                sample = in_stock[:10]  # Primeros 10
+                product_list = []
+                for p in sample:
+                    name = p.get('product_name', 'Producto sin nombre')
+                    price = p.get('price', 'N/D')
+                    category = p.get('category', 'N/D')
+                    product_list.append(f"• **{name}** — {category} — ${price}")
+                
+                more_info = f"\n\n*Mostrando {len(sample)} de {total} productos en stock*" if total > len(sample) else ""
+                
+                return f"**Productos en Stock** ({total})\n\n" + "\n".join(product_list) + more_info
+            
+            # Consulta de todos los productos
+            elif any(phrase in message_lower for phrase in ["todos los productos", "todo el inventario", "catálogo completo", "todos"]):
+                products = self.db_service.get_all_products_detailed()
+                
+                if not products:
+                    return "**Catálogo de Productos**\n\nNo hay productos registrados."
+                
+                total = len(products)
+                sample = products[:12]  # Primeros 12
+                product_list = []
+                for p in sample:
+                    name = p.get('product_name', 'Producto sin nombre')
+                    price = p.get('price', 'N/D')
+                    availability = p.get('availability', 'N/D')
+                    # Usar emoji para disponibilidad
+                    status_emoji = "✅" if availability == "En stock" else ("⚠️" if "bajo demanda" in availability.lower() else "❌")
+                    product_list.append(f"• **{name}** — ${price} {status_emoji} {availability}")
+                
+                more_info = f"\n\n*Mostrando {len(sample)} de {total} productos*" if total > len(sample) else ""
+                
+                return f"**Catálogo Completo** ({total} productos)\n\n" + "\n".join(product_list) + more_info
+            
+            # Productos bajo demanda (on demand)
+            if any(t in message_lower for t in ["bajo demanda", "on demand", "a demanda", "demanda"]):
+                products = self.db_service.get_all_products_detailed()
+                on_demand = [p for p in products if "bajo demanda" in str(p.get('availability', '')).lower()]
+                total = len(on_demand)
+                if total == 0:
+                    return "**Productos Bajo Demanda**\n\nNo hay productos bajo demanda actualmente."
+                
+                # Si el usuario pide tabla, mostrar tabla
+                if self._wants_table(message_lower):
+                    cols = [("Producto", "product_name"), ("Categoría", "category"), ("Precio", "price"), ("Disponibilidad", "availability")]
+                    # Limitar filas para no ser demasiado extenso
+                    rows = on_demand[:10]
+                    table = self._format_table(rows, cols)
+                    return f"**Productos Bajo Demanda** ({total})\n\n{table}"
+                
+                # Respuesta en lista breve
+                sample = on_demand[:8]
+                bullets = []
+                for p in sample:
+                    name = p.get('product_name', 'Producto sin nombre')
+                    cat = p.get('category', 'Categoría N/D')
+                    price = p.get('price', 'N/D')
+                    bullets.append(f"• {name} — {cat} — ${price}")
+                more = f"\n\n*Y {total - len(sample)} más...*" if total > len(sample) else ""
+                return f"**Productos Bajo Demanda** ({total})\n\n" + "\n".join(bullets) + more
+            
+            # Resumen/estadísticas de inventario
             if "estadísticas" in message_lower or "resumen" in message_lower:
                 stats = self.db_service.get_product_statistics()
-                avail_info = ', '.join([f"{k}: {v}" for k, v in stats['by_availability'].items()])
-                return f"[DATOS BD] Total productos: {stats['total_products']}. Disponibilidad: {avail_info}"
-            
-            elif "stock" in message_lower or "disponible" in message_lower:
-                target = "Sin stock" if ("sin stock" in message_lower or "agotado" in message_lower) else "En stock"
-                products = self.db_service.get_products_by_availability(target)
-                
-                if products:
-                    # Mostrar tabla si el usuario la pide o si hay muchos registros
-                    if self._wants_table(message_lower) or len(products) > 10:
-                        cols = [("ID", "product_id"), ("Producto", "product_name"), ("Disponibilidad", "availability")]
-                        table = self._format_table(products, cols)
-                        return f"[DATOS BD] Productos {target} ({len(products)}):\n{table}"
-                    else:
-                        # Lista completa en texto si son pocos
-                        names = [p.get('product_name','') for p in products]
-                        return f"[DATOS BD] Productos {target} ({len(products)}): {', '.join(names)}."
-                else:
-                    return "[SIN DATOS] No hay productos con ese criterio."
+                avail_list = "\n".join([f"• {k}: {v}" for k, v in stats.get('by_availability', {}).items()])
+                return f"**Resumen de Inventario**\n\n• Total: {stats.get('total_products', 0)}\n\n**Disponibilidad:**\n{avail_list}"
         
         # Resumen general del negocio
         elif "resumen" in message_lower and ("negocio" in message_lower or "tienda" in message_lower or "general" in message_lower):
             summary = self.db_service.get_business_summary()
-            return f"""[DATOS BD] RESUMEN TIENDA:
-- Pedidos totales: {summary['orders']['total_orders']}
-- Clientes únicos: {summary['total_customers']}
-- Productos totales: {summary['products']['total_products']}
-- Políticas definidas: {summary['policies']}"""
+            return f"**Resumen del Negocio**\n\n• Pedidos: {summary.get('orders', {}).get('total_orders', 0)}\n• Clientes: {summary.get('total_customers', 0)}\n• Productos: {summary.get('products', {}).get('total_products', 0)}\n• Políticas: {summary.get('policies', 0)}"
         
-        # Consulta de cliente específico
-        elif "cliente" in message_lower and any(word in message_lower for word in ["pedidos de", "compras de", "historial de"]):
-            # Extraer nombre del cliente de la consulta
-            parts = message_lower.split()
-            for i, part in enumerate(parts):
-                if part in ["cliente", "de"] and i + 1 < len(parts):
-                    customer_name = parts[i + 1].capitalize()
-                    if customer_name.startswith("cliente"):
-                        customer_name = f"Cliente {parts[i + 2]}" if i + 2 < len(parts) else customer_name
-                    
-                    orders = self.db_service.get_customer_orders(customer_name)
-                    if orders:
-                        order_info = ', '.join([f"{o['order_id']} ({o['status']})" for o in orders])
-                        return f"[DATOS BD] {customer_name} tiene {len(orders)} pedidos: {order_info}"
-                    else:
-                        return f"[SIN DATOS] No hay pedidos de {customer_name}."
-        
-        return "[DATOS BD] Puedo ayudarte con: lista de clientes, estadísticas de pedidos/productos, resumen del negocio."
+        # Fallback dinámico basado en datos (evita respuesta genérica)
+        business = self.db_service.get_business_summary()
+        orders_total = business.get('orders', {}).get('total_orders', 0)
+        customers_total = business.get('total_customers', 0)
+        products_total = business.get('products', {}).get('total_products', 0)
+        inventory_breakdown = business.get('products', {}).get('by_availability', {})
+        inv_lines = "\n".join([f"• {k}: {v}" for k, v in inventory_breakdown.items()]) if inventory_breakdown else "• Sin datos"
+        return (
+            "**Opciones basadas en tus datos**\n\n"
+            f"• Pedidos registrados: {orders_total}\n"
+            f"• Clientes registrados: {customers_total}\n"
+            f"• Productos en catálogo: {products_total}\n\n"
+            "Puedes pedirme, por ejemplo:\n"
+            "• Pedidos por estado (ej. 'pendiente', 'en proceso', 'entregado')\n"
+            "• Productos bajo demanda (lista o en tabla)\n"
+            "• Resumen de inventario por disponibilidad\n\n"
+            "**Disponibilidad actual:**\n" + inv_lines
+        )
+
+    def save_simple_conversation(self, mensaje_usuario: str, respuesta_bot: str, intencion: Optional[str] = None, entidades: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Guardar conversación simple en la tabla conversaciones_simple"""
+        try:
+            conversation_data = {
+                'mensaje_usuario': mensaje_usuario,
+                'respuesta_bot': respuesta_bot,
+                'intencion': intencion,
+                'entidades': entidades or {},
+                'created_at': datetime.now().isoformat()
+            }
+            
+            response = self.supabase.table('conversaciones_simple').insert(conversation_data).execute()
+            if response.data:
+                return response.data[0]
+        except Exception as e:
+            if os.getenv('DEBUG_LOG', '0') in ('1','true','TRUE'):
+                print(f"Error guardando conversación simple: {e}")
+        return None

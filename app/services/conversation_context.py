@@ -240,10 +240,11 @@ class SentimentAnalyzer:
 
 
 class ConversationMemory:
-    """Memoria persistente de conversaciones por usuario (sesión)"""
+    """Memoria persistente de conversaciones con integración Supabase"""
     
-    def __init__(self):
-        self.sessions = {}
+    def __init__(self, db_service=None):
+        self.sessions = {}  # Cache local de sesiones activas
+        self.db_service = db_service  # Servicio de base de datos
         self.global_insights = {
             "common_intents": {},
             "common_products": {},
@@ -251,11 +252,184 @@ class ConversationMemory:
             "average_satisfaction": []
         }
     
-    def get_or_create_session(self, session_id: str) -> ConversationContext:
-        """Obtener o crear una sesión de conversación"""
-        if session_id not in self.sessions:
-            self.sessions[session_id] = ConversationContext()
-        return self.sessions[session_id]
+    def get_or_create_session(self, session_id: str, user_identifier: str = None) -> ConversationContext:
+        """Obtener o crear una sesión de conversación con persistencia en Supabase"""
+        # Verificar en cache local primero
+        if session_id in self.sessions:
+            return self.sessions[session_id]
+        
+        # Cargar desde Supabase si existe
+        if self.db_service:
+            stored_session = self.db_service.get_conversation_session(session_id)
+            
+            if stored_session:
+                # Recrear contexto desde datos almacenados
+                context = self._recreate_context_from_stored(session_id, stored_session)
+                self.sessions[session_id] = context
+                return context
+        
+        # Crear nueva sesión
+        new_context = ConversationContext()
+        self.sessions[session_id] = new_context
+        
+        # Guardar nueva sesión en Supabase
+        if self.db_service:
+            self._create_session_in_db(session_id, user_identifier)
+        
+        return new_context
+    
+    def _recreate_context_from_stored(self, session_id: str, stored_session: Dict[str, Any]) -> ConversationContext:
+        """Recrear contexto de conversación desde datos almacenados"""
+        context = ConversationContext()
+        
+        # Restaurar estado de la sesión
+        context.frustration_level = stored_session.get('frustration_level', 0)
+        context.satisfaction_score = stored_session.get('satisfaction_score', 5)
+        context.conversation_state = stored_session.get('conversation_state', 'active')
+        
+        # Cargar mensajes desde la base de datos
+        if self.db_service:
+            messages = self.db_service.get_conversation_messages(session_id)
+            
+            for msg in messages:
+                if msg['message_type'] == 'user':
+                    user_message = msg['content']
+                    intent = msg.get('intent', '')
+                    entities = msg.get('entities', {})
+                    sentiment = msg.get('sentiment_score', 0.0)
+                    
+                    # Buscar respuesta del bot correspondiente
+                    bot_response = "Respuesta no encontrada"
+                    next_msg_idx = messages.index(msg) + 1
+                    if next_msg_idx < len(messages) and messages[next_msg_idx]['message_type'] == 'assistant':
+                        bot_response = messages[next_msg_idx]['content']
+                    
+                    # Agregar al contexto
+                    context.add_turn(user_message, bot_response, intent, entities, sentiment)
+        
+        return context
+    
+    def _create_session_in_db(self, session_id: str, user_identifier: str = None):
+        """Crear nueva sesión en la base de datos"""
+        try:
+            from app.models.pydantic_models import ConversationSessionCreate
+            
+            session_data = ConversationSessionCreate(
+                session_id=session_id,
+                title="Nueva conversación",
+                user_identifier=user_identifier,
+                metadata={"source": "waver_chat", "version": "1.0"}
+            )
+            
+            self.db_service.create_conversation_session(session_data)
+        except Exception as e:
+            print(f"Error creando sesión en BD: {e}")
+    
+    def save_session_state(self, session_id: str):
+        """Guardar estado actual de la sesión en Supabase"""
+        if session_id not in self.sessions or not self.db_service:
+            return
+        
+        try:
+            from app.models.pydantic_models import ConversationSessionUpdate
+            
+            context = self.sessions[session_id]
+            
+            update_data = ConversationSessionUpdate(
+                summary=context.get_conversation_summary(),
+                satisfaction_score=float(context.satisfaction_score),
+                frustration_level=context.frustration_level,
+                conversation_state=context.conversation_state,
+                metadata={
+                    "entities_mentioned": context.entities_mentioned,
+                    "pending_actions": context.pending_actions,
+                    "conversation_length": len(context.conversation_history)
+                }
+            )
+            
+            self.db_service.update_conversation_session(session_id, update_data)
+        except Exception as e:
+            print(f"Error guardando estado de sesión: {e}")
+    
+    def save_message_to_db(self, session_id: str, message_type: str, content: str, 
+                          intent: str = None, entities: Dict = None, 
+                          sentiment_score: float = None, processing_time_ms: int = None):
+        """Guardar mensaje individual en la base de datos"""
+        if not self.db_service:
+            return
+        
+        try:
+            from app.models.pydantic_models import ConversationMessageCreate
+            
+            message_data = ConversationMessageCreate(
+                session_id=session_id,
+                message_type=message_type,
+                content=content,
+                intent=intent,
+                entities=entities or {},
+                sentiment_score=sentiment_score,
+                processing_time_ms=processing_time_ms,
+                metadata={"timestamp": datetime.now().isoformat()}
+            )
+            
+            self.db_service.add_conversation_message(message_data)
+        except Exception as e:
+            print(f"Error guardando mensaje: {e}")
+    
+    def get_session_list(self, user_identifier: str = None, limit: int = 20) -> List[Dict[str, Any]]:
+        """Obtener lista de sesiones de conversación"""
+        if not self.db_service:
+            return []
+        
+        return self.db_service.list_conversation_sessions(limit, user_identifier)
+    
+    def delete_session(self, session_id: str) -> bool:
+        """Eliminar sesión completamente"""
+        # Remover del cache local
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+        
+        # Eliminar de la base de datos
+        if self.db_service:
+            return self.db_service.delete_conversation_session(session_id)
+        
+        return False
+    
+    def get_conversation_analytics(self, days: int = 7) -> Dict[str, Any]:
+        """Obtener analytics de conversaciones"""
+        if not self.db_service:
+            return {}
+        
+        return self.db_service.get_conversation_analytics(days)
+    
+    def cleanup_old_conversations(self, days_old: int = 30) -> int:
+        """Limpiar conversaciones antiguas"""
+        # Limpiar cache local de sesiones inactivas
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        inactive_sessions = []
+        
+        for session_id, context in self.sessions.items():
+            if context.conversation_history:
+                last_turn = context.conversation_history[-1]
+                last_time = datetime.fromisoformat(last_turn["timestamp"])
+                if last_time < cutoff_time:
+                    inactive_sessions.append(session_id)
+        
+        for session_id in inactive_sessions:
+            del self.sessions[session_id]
+        
+        # Limpiar base de datos
+        if self.db_service:
+            return self.db_service.cleanup_old_conversations(days_old)
+        
+        return len(inactive_sessions)
+    
+    def search_conversations(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """Buscar conversaciones por contenido"""
+        if not self.db_service:
+            return []
+        
+        return self.db_service.search_conversations(query, limit)
     
     def update_global_insights(self, intent: str, products: List[str] = None, satisfaction: float = None):
         """Actualizar insights globales de todas las conversaciones"""
@@ -285,15 +459,3 @@ class ConversationMemory:
             reverse=True
         )
         return [product for product, _ in sorted_products[:top_n]]
-    
-    def clean_old_sessions(self, hours: int = 24):
-        """Limpiar sesiones antiguas"""
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        
-        for session_id in list(self.sessions.keys()):
-            session = self.sessions[session_id]
-            if session.conversation_history:
-                last_turn = session.conversation_history[-1]
-                last_time = datetime.fromisoformat(last_turn["timestamp"])
-                if last_time < cutoff_time:
-                    del self.sessions[session_id]

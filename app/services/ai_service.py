@@ -26,6 +26,9 @@ class IntentClassifier:
                 r"(?i).*(productos.*sin.*stock|productos.*agotados).*",
                 r"(?i).*(resumen.*negocio|resumen.*tienda|resumen.*general).*",
                 r"(?i).*(top.*clientes|mejores.*clientes|principales.*clientes).*",
+                r"(?i).*(todos.*productos|todo.*inventario|cat[aá]logo.*completo).*",
+                r"(?i).*(productos.*en.*stock|productos.*disponibles|qu[eé].*tenemos).*",
+                r"(?i).*(mostrar.*productos|ver.*productos|listar.*productos).*",
                 r"(?i).*(inventario|productos.*disponibles).*",
                 r"(?i).*(historial.*cliente|pedidos.*cliente|compras.*cliente).*"
             ],
@@ -95,7 +98,32 @@ class IntentClassifier:
             "total de pedidos", "cuántos pedidos", "cuantos pedidos", "pedidos por estado", "productos sin stock",
             "productos en stock", "en stock",
             "resumen del negocio", "top clientes", "inventario completo",
-            "historial de", "reporte de", "métricas", "indicadores"
+            "historial de", "reporte de", "métricas", "indicadores",
+            # Nuevos keywords para consultas de productos generales
+            "cuales productos", "cuáles productos", "que productos", "qué productos", 
+            "todos los productos", "lista de productos", "productos disponibles",
+            "productos tenemos", "tenemos en stock", "inventario", "catálogo",
+            "comparativas", "comparar", "completas", "completo", "general",
+            # Keywords específicos de tecnología
+            "smartphones", "laptops", "tablets", "teléfonos", "computadoras",
+            "monitores", "cámaras", "auriculares", "accesorios", "gaming",
+            "apple", "samsung", "iphone", "ipad", "macbook", "android",
+            "productos tecnológicos", "dispositivos", "electrónicos", "gadgets",
+            "equipos", "tecnología", "tech", "hardware", "software",
+            # Keywords de productos reales del inventario
+            "quantum", "processor", "nebula", "smartwatch", "orion", "vr", "headset",
+            "cyber", "synth", "keyboard", "titan", "mouse", "gaming", "helios", "solar",
+            "echo", "buds", "spectra", "monitor", "aura", "light", "stealth", "drone",
+            "nova", "pad", "vortex", "cooling", "chroma", "key", "matrix", "router",
+            "zenith", "power", "bank", "pulse", "wave", "speakers", "core", "connect",
+            "fusion", "cam", "4k", "equinox", "projector", "galileo", "pen", "stylus",
+            "cosmo", "mic", "hyper", "drive", "ssd", "atlas", "mount", "stand",
+            "infinity", "webcam", "elysium", "chair", "terra", "scanner", "3d",
+            "apollo", "audio", "interface", "rift", "cables", "vertex", "graphics",
+            "pioneer", "robotic", "arm", "guardian", "smart", "lock", "odyssey",
+            "backpack", "nomad", "portable", "momentum", "ring", "catalyst",
+            "converter", "element", "air", "purifier", "synapse", "adapter",
+            "horizon", "docking", "station", "legacy", "console"
         ]
         message_lower = message.lower()
         return any(keyword in message_lower for keyword in analytical_keywords)
@@ -104,7 +132,17 @@ class IntentClassifier:
         """Verifica si una intención debería ser reclasificada como analítica"""
         # Si detecta pedido/producto pero es consulta masiva
         if detected_intent in ["consulta_pedido", "consulta_producto"]:
-            analytical_modifiers = ["todos", "lista", "cuántos", "total", "estadísticas", "resumen"]
+            analytical_modifiers = [
+                "todos", "lista", "cuántos", "cuantos", "total", "estadísticas", "resumen",
+                "cuales", "cuáles", "que", "qué", "disponibles", "tenemos", "inventario",
+                "catálogo", "completas", "completo", "comparativas", "comparar",
+                "general", "en stock",
+                # Modificadores específicos de tecnología
+                "smartphones", "laptops", "tablets", "teléfonos", "computadoras",
+                "monitores", "cámaras", "auriculares", "gaming", "tecnológicos",
+                "dispositivos", "electrónicos", "equipos", "accesorios",
+                "marcas", "modelos", "categorías", "tipos", "gama", "precios"
+            ]
             message_lower = message.lower()
             return any(modifier in message_lower for modifier in analytical_modifiers)
         return False
@@ -162,103 +200,63 @@ class IntentClassifier:
         return entities
 
 class LLMService:
-    """Servicio para interactuar con modelos de lenguaje"""
+    """Service for interacting with language models - Gemini only"""
     
     def __init__(self):
-        # Priorizar Gemini como servicio principal
+        # Use Gemini as the primary and only service
         self.gemini_service = GeminiService()
-        self.huggingface_api_key = os.getenv("HUGGINGFACE_API_KEY")
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
     
     def generate_response_with_gemini(self, prompt: str, context: str = "") -> str:
-        """Generar respuesta usando Gemini (opción principal)"""
+        """Generate response using Gemini (primary option)"""
         if self.gemini_service.is_available():
             return self.gemini_service.generate_response(prompt, context)
         else:
             return self._get_fallback_response(prompt)
     
     def generate_enhanced_response(self, base_response: str, user_message: str, context: str = "") -> str:
-        """Mejorar respuesta usando Gemini"""
+        """Enhance response using Gemini"""
         if self.gemini_service.is_available():
             return self.gemini_service.enhance_response(base_response, user_message, context)
         else:
             return base_response
     
     def generate_personalized_response(self, intent: str, entities: dict, context_data: dict, user_message: str) -> str:
-        """Generar respuesta personalizada usando Gemini"""
+        """Generate personalized response using Gemini"""
         if self.gemini_service.is_available():
             return self.gemini_service.generate_personalized_response(intent, entities, context_data, user_message)
         else:
             return self._get_fallback_response(user_message)
     
-    def generate_response_with_huggingface(self, prompt: str) -> str:
-        """Generar respuesta usando HuggingFace (fallback)"""
-        try:
-            # Usar el modelo gratuito de HuggingFace
-            API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
-            headers = {"Authorization": f"Bearer {self.huggingface_api_key}"}
-            
-            payload = {
-                "inputs": prompt,
-                "parameters": {
-                    "max_length": 150,
-                    "temperature": 0.7,
-                    "return_full_text": False
-                }
-            }
-            
-            response = requests.post(API_URL, headers=headers, json=payload)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if isinstance(result, list) and len(result) > 0:
-                    return result[0].get("generated_text", "").strip()
-            
-            return "Lo siento, no puedo procesar tu consulta en este momento."
-            
-        except Exception as e:
-            print(f"Error with HuggingFace API: {e}")
-            return "Lo siento, hay un problema técnico. Por favor intenta más tarde."
-    
     def generate_response_with_fallback(self, prompt: str, context: str = "") -> str:
-        """Generar respuesta con jerarquía: Gemini -> HuggingFace -> Fallback"""
-        # 1. Intentar con Gemini primero
+        """Generate response with Gemini or fallback"""
+        # Try Gemini first
         if self.gemini_service.is_available():
             try:
                 response = self.generate_response_with_gemini(prompt, context)
-                if response and "no está disponible" not in response.lower():
+                if response and "not available" not in response.lower():
                     return response
             except Exception as e:
-                print(f"Error con Gemini: {e}")
+                print(f"Error with Gemini: {e}")
         
-        # 2. Intentar con HuggingFace si Gemini no funciona
-        if self.huggingface_api_key:
-            try:
-                response = self.generate_response_with_huggingface(prompt)
-                if response and "no puedo procesar" not in response.lower():
-                    return response
-            except Exception as e:
-                print(f"Error con HuggingFace: {e}")
-        
-        # 3. Usar respuesta predefinida como último recurso
+        # Use predefined response as fallback
         return self._get_fallback_response(prompt)
     
     def _get_fallback_response(self, prompt: str) -> str:
-        """Respuestas predefinidas como fallback"""
-        # Análisis simple del prompt para generar respuesta apropiada
+        """Predefined administrative responses as fallback in Spanish"""
+        # Simple prompt analysis to generate appropriate administrative response
         prompt_lower = prompt.lower()
         
-        if "pedido" in prompt_lower or "orden" in prompt_lower:
-            return "Para consultar el estado de tu pedido, por favor proporciona tu número de pedido. Nuestro equipo verificará la información y te proporcionará una actualización."
+        if "pedido" in prompt_lower or "orden" in prompt_lower or "order" in prompt_lower:
+            return "Para revisar el estado de un pedido específico, proporciona el número de pedido. Puedo acceder al sistema y verificar la información de estado, cliente y tracking."
         
-        elif "producto" in prompt_lower or "disponible" in prompt_lower:
-            return "Te ayudo a consultar la disponibilidad de productos. Por favor especifica el nombre del producto que te interesa."
+        elif "producto" in prompt_lower or "disponible" in prompt_lower or "product" in prompt_lower:
+            return "Puedo ayudarte a verificar el inventario y disponibilidad de productos. Especifica el nombre del producto o categoría para consultar el stock actual."
         
-        elif "política" in prompt_lower or "devolución" in prompt_lower:
-            return "Puedes consultar nuestras políticas de devolución y garantía. ¿Hay algún aspecto específico sobre el que te gustaría saber más?"
+        elif "política" in prompt_lower or "devolución" in prompt_lower or "policy" in prompt_lower:
+            return "Puedo consultar las políticas configuradas en el sistema. ¿Qué política específica necesitas revisar? (devoluciones, envíos, horarios, garantías)"
         
-        elif "hola" in prompt_lower or "ayuda" in prompt_lower:
-            return "¡Hola! Soy tu asistente virtual. Puedo ayudarte con consultas sobre pedidos, productos, políticas de la empresa y más. ¿En qué puedo asistirte hoy?"
+        elif "hola" in prompt_lower or "ayuda" in prompt_lower or "hello" in prompt_lower or "help" in prompt_lower:
+            return "¡Hola! Soy tu asistente administrativo para la gestión de Waver. Puedo ayudarte con monitoreo de pedidos, inventario, análisis de clientes, reportes y configuración de políticas. ¿Qué información necesitas revisar?"
         
         else:
-            return "Entiendo tu consulta. Para brindarte la mejor asistencia, podrías proporcionar más detalles o contactar con nuestro equipo de atención al cliente."
+            return "Consulta recibida. Para una respuesta más específica, proporciona más detalles sobre qué información de la tienda necesitas revisar (pedidos, inventario, clientes, reportes)."

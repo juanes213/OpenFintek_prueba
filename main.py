@@ -6,7 +6,6 @@ import uvicorn
 import os
 import webbrowser
 from dotenv import load_dotenv
-import time
 
 from app.routers import chat
 from app.models.supabase_client import supabase_client
@@ -24,30 +23,16 @@ app = FastAPI(
 # Configurar archivos estáticos y templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-# Ensure template changes are picked up without full server restart in dev
-try:
-    templates.env.auto_reload = True
-except Exception:
-    pass
 
 # Headers para optimización y caching
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
     
-    # Cache para archivos estáticos (desactivar en DEBUG)
+    # Cache para archivos estáticos
     if request.url.path.startswith("/static/"):
         if any(request.url.path.endswith(ext) for ext in [".css", ".js", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg"]):
-            debug = os.getenv("DEBUG", "True").lower() == "true"
-            if debug:
-                response.headers["Cache-Control"] = "no-store"
-            else:
-                response.headers["Cache-Control"] = "public, max-age=31536000"  # 1 año
-    else:
-        # Para HTML y API en desarrollo, evitar cualquier caché del navegador
-        debug = os.getenv("DEBUG", "True").lower() == "true"
-        if debug:
-            response.headers["Cache-Control"] = "no-store"
+            response.headers["Cache-Control"] = "public, max-age=31536000"  # 1 año
         
     # Headers de seguridad básicos
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -62,10 +47,7 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Página principal del chatbot"""
-    debug = os.getenv("DEBUG", "True").lower() == "true"
-    # Permitir override via query (?v=123) y si no, usar timestamp en DEBUG para bustear caché
-    v = request.query_params.get("v") or (str(int(time.time())) if debug else "1")
-    return templates.TemplateResponse("chat.html", {"request": request, "v": v})
+    return templates.TemplateResponse("chat.html", {"request": request})
 
 @app.get("/health")
 async def health_check():
@@ -104,7 +86,6 @@ async def startup_event():
 
 if __name__ == "__main__":
     bind_all = os.getenv("BIND_ALL", "0") in ("1", "true", "TRUE")
-    # Para desarrollo local usar 127.0.0.1; 0.0.0.0 es solo un comodín de escucha y no siempre navegable.
     host = "0.0.0.0" if bind_all else os.getenv("HOST", "127.0.0.1")
     port = int(os.getenv("PORT", 8000))
     debug = os.getenv("DEBUG", "True").lower() == "true"

@@ -99,16 +99,16 @@ class GeminiService:
         
         try:
             prompt = f"""
-            Clasifica la siguiente consulta de un cliente de e-commerce en una de estas categorías:
+            Clasifica la siguiente consulta del propietario de una tienda de e-commerce en una de estas categorías:
             
-            1. consulta_analitica - Análisis, estadísticas, listas completas (ej: "todos los clientes", "resumen de pedidos")
-            2. consulta_pedido - Pregunta sobre UN pedido específico
-            3. consulta_producto - Pregunta sobre UN producto específico
-            4. politicas_empresa - Preguntas sobre horarios, devoluciones, envíos
-            5. informacion_general - Saludos, despedidas, ayuda general
-            6. escalacion_humana - Solicita hablar con una persona
+            1. consulta_analitica - Análisis, estadísticas, reportes, resúmenes (ej: "todos los clientes", "resumen de pedidos")
+            2. consulta_pedido - Pregunta sobre UN pedido específico o estado de pedidos
+            3. consulta_producto - Pregunta sobre UN producto específico o inventario
+            4. politicas_empresa - Preguntas sobre horarios, políticas internas, configuraciones
+            5. informacion_general - Saludos, ayuda general, consultas administrativas generales
+            6. escalacion_humana - Necesita asistencia adicional o soporte técnico
             
-            Consulta del cliente: "{message}"
+            Consulta del propietario: "{message}"
             
             SOLO responde con el nombre de la categoría:
             """
@@ -152,19 +152,22 @@ class GeminiService:
             return base_response
         
         try:
-            prompt = f"""
-            Eres un agente de servicio al cliente.
+            prompt = f"""Eres un asistente administrativo para el propietario de Waver.
             
-            Consulta: "{user_message}"
+            Consulta del propietario: "{user_message}"
             Respuesta base: "{base_response}"
             Contexto: {context}
             
             REGLAS:
             - MANTÉN los datos exactos de la respuesta base
-            - Solo mejora la redacción (más natural)
+            - Solo mejora la redacción (más ejecutiva y profesional)
             - Máximo 250 palabras
-            - Directo y conciso
+            - Enfoque administrativo y de gestión
             - NO inventes información nueva
+            - NO uses emojis
+            - Mantén tono ejecutivo profesional
+            - Proporciona insights de negocio cuando sea relevante
+            - RESPONDE EN ESPAÑOL
             
             Respuesta mejorada:
             """
@@ -188,26 +191,35 @@ class GeminiService:
             return base_response
     
     def _build_prompt(self, user_message: str, context: str) -> str:
-        """Construir prompt simple para Gemini"""
+        """Construir prompt completo para Gemini con foco en datos reales de la BD"""
         system_prompt = """
-        Eres un agente de servicio al cliente amigable y útil para una tienda de e-commerce.
+        Eres un asistente administrativo para Waver.
         
-        Puedes ayudar con:
-        - Consultas sobre pedidos específicos o generales
-        - Búsquedas de productos y catálogo completo
-        - Información sobre políticas de la empresa
-        - Análisis de datos cuando te proporcionen información de la base de datos
+        REGLAS ESTRICTAS:
+        - Usa EXCLUSIVAMENTE la información proporcionada en el contexto (base de datos)
+        - NO inventes datos ni asumas información ausente
+        - Si el dato solicitado no está en el contexto, di: "No se encuentra en la base de datos"
+        - Responde SIEMPRE en español, con tono profesional y claro
+        
+        POLÍTICAS:
+        - Cuando respondas sobre políticas, incluye el TÍTULO (topic) y la INFORMACIÓN exacta (info)
+        - Si hay varias políticas relevantes, enuméralas en orden lógico
+        
+        PEDIDOS:
+        - Muestra: ID del pedido, nombre del cliente y estado
+        
+        PRODUCTOS:
+        - Muestra: nombre, ID y disponibilidad cuando aplique
         
         FORMATO DE RESPUESTA:
-        - Usa **texto** para resaltar información importante (nombres, números, estados)
-        - Sé claro, completo y preciso
-        - Si te proporcionan información de la base de datos, analízala y responde de manera útil
-        - Si el usuario hace preguntas generales, usa toda la información disponible para responder
-        - Mantén las respuestas naturales, completas y útiles
+        - Usa **títulos en negrita** para secciones y encabezados
+        - Usa bullets con • para listas; numeración cuando corresponda (1., 2., 3.)
+        - NO uses emojis
+        - Sé conciso pero completo; incluye todos los elementos relevantes del contexto
         """
         
         if context and context.strip():
-            full_prompt = f"{system_prompt}\n\nInformación de la base de datos:\n{context}\n\nUsuario: {user_message}\n\nAsistente:"
+            full_prompt = f"{system_prompt}\n\nContexto (datos de la base de datos):\n{context}\n\nUsuario: {user_message}\n\nAsistente:"
         else:
             full_prompt = f"{system_prompt}\n\nUsuario: {user_message}\n\nAsistente:"
         
@@ -239,32 +251,39 @@ class GeminiService:
             frustration_level = 0
             satisfaction_score = 5
         
-        # Prompt mejorado con estrategias comerciales
-        prompt = f"""
-        Eres un agente de servicio al cliente para una tienda de e-commerce.
+        # Prompt mejorado con estrategias administrativas para el propietario de Waver
+        prompt = f"""Eres un asistente administrativo especializado para el propietario de Waver.
         
-        REGLAS CRÍTICAS:
+        REGLAS CRÍTICAS DE FORMATO:
         1. SOLO usa la información proporcionada en "DATOS DISPONIBLES"
         2. NO inventes datos, precios, estados o información
         3. Si no hay datos, di "No tengo esa información en el sistema"
-        4. Sé PRECISO y COMPLETO - incluye toda la información relevante
-        5. Usa formato claro con **negritas** para datos importantes
+        4. Sé PRECISO y COMPLETO - incluye toda la información relevante para gestión
+        5. Usa formato claro con **negritas** para datos críticos de negocio
+        6. Para listas, usa SOLO guiones (-) NUNCA asteriscos (*)
+        7. Estructura respuestas con subtítulos **En Negritas** cuando sea apropiado
+        8. Usa numeración (1., 2., 3.) para pasos o elementos secuenciales
+        9. Mantén párrafos cortos para mejor legibilidad
+        10. NO uses emojis, mantén un tono ejecutivo profesional
+        11. Sé conciso pero detallado con insights para toma de decisiones
         
-        CONTEXTO:
+        CONTEXTO ADMINISTRATIVO:
         - Tipo de consulta: {intent}
-        - Frustración del cliente: {frustration_level}/10
-        {"- El cliente está frustrado, sé empático" if should_apologize else ""}
+        - Usuario: Propietario de Waver
+        - Enfoque: Gestión empresarial y monitoreo
         
-        MENSAJE DEL CLIENTE:
+        CONSULTA DEL PROPIETARIO:
         "{user_message}"
         
         DATOS DISPONIBLES:
         {context}
         
-        RESPONDE:
-        - Si hay datos: úsalos exactamente como están y proporciona información completa
+        RESPONDE COMO ASISTENTE ADMINISTRATIVO:
+        - Si hay datos: proporciona análisis y insights útiles para el negocio
         - Si NO hay datos: "No encuentro esa información en el sistema"
-        - Sé claro, informativo y completo en tu respuesta
+        - Enfoque en: rendimiento, inventario, clientes, pedidos, oportunidades
+        - Sugiere acciones administrativas cuando sea relevante
+        - Mantén un tono profesional ejecutivo sin emojis
         
         RESPUESTA:
         """
